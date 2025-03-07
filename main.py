@@ -12,7 +12,7 @@ start_time = st.text_input("Start time (HH:MM)", "09:30")
 period_duration = st.number_input("Period duration (minutes)", min_value=15, step=15, value=60)
 time_slot_labels = generate_time_slots(num_days, num_periods, start_time, period_duration)
 total_time_slots = len(time_slot_labels)
-#st.write(f"Generated time slots: {', '.join(time_slot_labels)}")
+# st.write(f"Generated time slots: {', '.join(time_slot_labels)}")
 
 # Teachers
 st.header("Teachers")
@@ -72,7 +72,9 @@ if st.button("Generate Schedule"):
                 course_objects.append(course)
             batch_objects.append(batch)
 
-        if schedule(0, course_objects, teacher_objects, time_slot_labels):
+        # Use integer indices for scheduling instead of string labels
+        time_slot_indices = list(range(total_time_slots))
+        if schedule(0, course_objects, teacher_objects, time_slot_indices, num_periods, num_days):
             classroom_assignment = assign_classrooms(course_objects, total_time_slots, num_classrooms)
             if classroom_assignment:
                 st.success("Schedule generated successfully!")

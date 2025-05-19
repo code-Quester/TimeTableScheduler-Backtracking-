@@ -7,7 +7,7 @@ st.title("Scheduling System")
 # Time Slots Configuration
 st.header("Time Slots Configuration")
 num_days = st.number_input("Number of days", min_value=1, step=1, value=5)
-num_periods = st.number_input("Periods per day", min_value=1, step=1, value=8)
+num_periods = st.number_input("Periods per day", min_value=1, step=1, value=7)
 start_time = st.text_input("Start time (HH:MM)", "09:30")
 period_duration = st.number_input("Period duration (minutes)", min_value=15, step=15, value=60)
 time_slot_labels, time_ranges = generate_time_slots(num_days, num_periods, start_time, period_duration)
@@ -111,7 +111,7 @@ if st.button("Generate Schedule"):
                 st.success("Schedule generated successfully!")
                 for batch in batch_objects:
                     schedule_table = create_batch_schedule_table(
-                        batch.name, course_objects, time_slot_labels, num_days, num_periods, time_ranges
+                        batch.name, course_objects, time_slot_labels, num_days, num_periods, time_ranges,classroom_assignment
                     )
                     st.write(f"### Timetable for {batch.name}")
                     st.table(schedule_table)

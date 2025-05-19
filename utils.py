@@ -44,11 +44,11 @@ def generate_time_slots(num_days, num_periods, start_time, period_duration):
                         break
     return time_slots, time_ranges
 
-def create_batch_schedule_table(batch, courses, time_slots, num_days, num_periods, time_ranges):
+def create_batch_schedule_table(batch, courses, time_slots, num_days, num_periods, time_ranges,classroom_assignment):
     """Create a schedule table for a specific batch with breaks, starting at start_time and covering num_periods."""
     # Extract unique time headers from time_slots
     time_headers = sorted(set(ts.split('-', 1)[1] for ts in time_slots), key=lambda x: parse_time(x.split('-')[0]))
-    
+
     # Initialize table with days and time headers
     table = {f"Day{day+1}": {header: [] for header in time_headers} for day in range(num_days)}
     
@@ -85,7 +85,8 @@ def create_batch_schedule_table(batch, courses, time_slots, num_days, num_period
                     day_str, time_range = time_slots[ts].split('-', 1)
                     day = day_str
                     if time_range in time_headers:  # Only include if within headers
-                        info = f"{course.name} ({course.teacher.name}, Classroom {course.classroom})"
+                        classroom = classroom_assignment.get((course.name, ts), "N/A")
+                        info = f"{course.name} ({course.teacher.name}, Classroom {classroom})"
                         table[day][time_range].append(info)
     
     # Convert to DataFrame

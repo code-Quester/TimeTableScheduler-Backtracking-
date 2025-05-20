@@ -13,7 +13,6 @@ def generate_time_slots(num_days, num_periods, start_time, period_duration):
     """Generate time slot labels like 'Day1-9:30-10:30' with breaks, limited to num_periods teaching slots."""
     breaks = [
         {"start": parse_time("11:30"), "end": parse_time("11:45")},  # Short break
-        # {"start": parse_time("12:30"), "end": parse_time("13:30")},  # Extra break
         {"start": parse_time("13:45"), "end": parse_time("14:30")}    # Long break
     ]
     time_slots = []

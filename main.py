@@ -45,7 +45,7 @@ for i in range(num_batches):
         num_theory_courses = st.number_input(f"Number of theory courses", min_value=0, key=f"b_theory_courses_{i}", value=2)
         theory_courses = []
         for j in range(num_theory_courses):
-            name = st.text_input(f"Theory Course name (also the subject)", key=f"tc_name_{i}_{j}", value=f"Course{j+1}")
+            name = st.text_input(f"Theory Course name", key=f"tc_name_{i}_{j}", value=f"Course{j+1}")
             required_hours = st.number_input(f"Required hours", min_value=1, key=f"tc_hours_{i}_{j}", value=2)
             theory_courses.append({"name": name, "subject": name, "required_hours": required_hours, "type": "theory"})
         
@@ -54,12 +54,12 @@ for i in range(num_batches):
         labs = []
         for j in range(num_labs):
             name = st.text_input(f"Lab name", key=f"l_name_{i}_{j}", value=f"Lab{j+1}")
-            subject = st.text_input(f"Lab subject", key=f"l_subject_{i}_{j}", value=f"Lab{j+1}")
+            # subject = st.text_input(f"Lab subject", key=f"l_subject_{i}_{j}", value=f"Lab{j+1}")
             number_of_sessions = st.number_input(f"Number of sessions", min_value=1, key=f"l_sessions_{i}_{j}", value=1)
             session_duration = st.selectbox(f"Session duration (hours)", options=[3, 4], key=f"l_duration_{i}_{j}")
             labs.append({
                 "name": name,
-                "subject": subject,
+                "subject": name,
                 "number_of_sessions": number_of_sessions,
                 "session_duration": session_duration,
                 "type": "lab"

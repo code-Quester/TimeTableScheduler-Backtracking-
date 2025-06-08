@@ -6,6 +6,7 @@ from scheduler import Teacher, Course, Batch, schedule, assign_classrooms
 from utils import generate_time_slots, create_batch_schedule_table
 import pandas as pd
 import io
+import time
 
 # Database functions
 def init_db():
@@ -216,62 +217,74 @@ elif st.session_state.page == 'main':
         st.session_state.page = 'login'
         st.rerun()
 
-    # Load user's saved inputs first
-    existing_data = load_user_inputs(user_id)
-    if existing_data:
-        # Update session state with all saved data before creating any widgets
-        for key, value in existing_data.items():
-            if key not in ['teachers', 'batches']:  # Handle these separately
-                st.session_state[key] = value
+    # Initialize edit mode if not exists
+    if 'edit_mode' not in st.session_state:
+        st.session_state.edit_mode = False
+
+    # Load saved data if in edit mode
+    if st.session_state.edit_mode:
+        existing_data = load_user_inputs(user_id)
+        if existing_data:
+            # Store the data in session state for widget initialization
+            st.session_state.saved_data = existing_data
 
     # Time Slots Configuration
     st.header("Time Slots Configuration")
-    num_days = st.number_input("Number of days", min_value=1, step=1, value=st.session_state.get("num_days", 5), key="num_days")
-    num_periods = st.number_input("Periods per day", min_value=1, step=1, value=st.session_state.get("num_periods", 7), key="num_periods")
-    start_time = st.text_input("Start time (HH:MM)", value=st.session_state.get("start_time", "09:30"), key="start_time")
-    period_duration = st.number_input("Period duration (minutes)", min_value=15, step=15, value=st.session_state.get("period_duration", 60), key="period_duration")
+    
+    # Initialize default values
+    default_days = st.session_state.get('saved_data', {}).get('num_days', 5) if st.session_state.edit_mode else 5
+    default_periods = st.session_state.get('saved_data', {}).get('num_periods', 7) if st.session_state.edit_mode else 7
+    default_start = st.session_state.get('saved_data', {}).get('start_time', "09:30") if st.session_state.edit_mode else "09:30"
+    default_duration = st.session_state.get('saved_data', {}).get('period_duration', 60) if st.session_state.edit_mode else 60
+
+    num_days = st.number_input("Number of days", min_value=1, step=1, value=default_days, key="num_days")
+    num_periods = st.number_input("Periods per day", min_value=1, step=1, value=default_periods, key="num_periods")
+    start_time = st.text_input("Start time (HH:MM)", value=default_start, key="start_time")
+    period_duration = st.number_input("Period duration (minutes)", min_value=15, step=15, value=default_duration, key="period_duration")
+    
     time_slot_labels, time_ranges = generate_time_slots(num_days, num_periods, start_time, period_duration)
     total_time_slots = len(time_slot_labels)
 
-    # Now handle the complex data structures after time slots are generated
-    if existing_data:
-        # Handle teachers data
-        if 'teachers' in existing_data:
-            for i, teacher in enumerate(existing_data['teachers']):
-                st.session_state[f't_name_{i}'] = teacher['name']
-                st.session_state[f't_subjects_{i}'] = ','.join(teacher['subjects'])
-                st.session_state[f't_unavailable_{i}'] = [slot for idx, slot in enumerate(time_slot_labels) if idx not in teacher['available_time_slots']]
-                st.session_state[f't_hours_{i}'] = teacher['max_hours']
-        
-        # Handle batches data
-        if 'batches' in existing_data:
-            for i, batch in enumerate(existing_data['batches']):
-                st.session_state[f'b_name_{i}'] = batch['name']
-                
-                # Handle theory courses
-                for j, course in enumerate(batch['theory_courses']):
-                    st.session_state[f'tc_name_{i}_{j}'] = course['name']
-                    st.session_state[f'tc_hours_{i}_{j}'] = course['required_hours']
-                
-                # Handle labs
-                for j, lab in enumerate(batch['labs']):
-                    st.session_state[f'l_name_{i}_{j}'] = lab['name']
-                    st.session_state[f'l_sessions_{i}_{j}'] = lab['number_of_sessions']
-                    st.session_state[f'l_duration_{i}_{j}'] = lab['session_duration']
-
     # Teachers
     st.header("Teachers")
-    num_teachers = st.number_input("Number of teachers", min_value=1, step=1, value=st.session_state.get("num_teachers", 2), key="num_teachers")
+    default_teachers = st.session_state.get('saved_data', {}).get('num_teachers', 2) if st.session_state.edit_mode else 2
+    num_teachers = st.number_input("Number of teachers", min_value=1, step=1, value=default_teachers, key="num_teachers")
     teachers = []
     all_time_slots = time_slot_labels
 
     for i in range(num_teachers):
         with st.expander(f"Teacher {i+1}"):
-            name = st.text_input(f"Name", key=f"t_name_{i}", value=st.session_state.get(f"t_name_{i}", f"Teacher{i+1}"))
-            subjects = st.text_input(f"Subjects (comma-separated)", key=f"t_subjects_{i}", value=st.session_state.get(f"t_subjects_{i}", ""))
-            unavailable = st.multiselect(f"Unavailable time slots", options=all_time_slots, key=f"t_unavailable_{i}", default=st.session_state.get(f"t_unavailable_{i}", []))
+            # Get saved values if in edit mode
+            saved_teacher = None
+            if st.session_state.edit_mode and 'teachers' in st.session_state.get('saved_data', {}):
+                saved_teachers = st.session_state.saved_data['teachers']
+                if i < len(saved_teachers):
+                    saved_teacher = saved_teachers[i]
+
+            name = st.text_input(
+                f"Name",
+                value=saved_teacher['name'] if saved_teacher else f"Teacher{i+1}",
+                key=f"t_name_{i}"
+            )
+            subjects = st.text_input(
+                f"Subjects (comma-separated)",
+                value=','.join(saved_teacher['subjects']) if saved_teacher else "",
+                key=f"t_subjects_{i}"
+            )
+            unavailable = st.multiselect(
+                f"Unavailable time slots",
+                options=all_time_slots,
+                default=[slot for idx, slot in enumerate(all_time_slots) if idx not in saved_teacher['available_time_slots']] if saved_teacher else [],
+                key=f"t_unavailable_{i}"
+            )
             available_time_slots = [idx for idx, slot in enumerate(all_time_slots) if slot not in unavailable]
-            max_hours = st.number_input(f"Max hours", min_value=1, step=1, key=f"t_hours_{i}", value=st.session_state.get(f"t_hours_{i}", 10))
+            max_hours = st.number_input(
+                f"Max hours",
+                min_value=1,
+                step=1,
+                value=saved_teacher['max_hours'] if saved_teacher else 10,
+                key=f"t_hours_{i}"
+            )
             teachers.append({
                 "name": name,
                 "subjects": [s.strip() for s in subjects.split(",")] if subjects else [],
@@ -281,23 +294,88 @@ elif st.session_state.page == 'main':
 
     # Batches and Courses
     st.header("Batches and Courses")
-    num_batches = st.number_input("Number of batches", min_value=1, step=1, value=st.session_state.get("num_batches", 2), key="num_batches")
+    default_batches = st.session_state.get('saved_data', {}).get('num_batches', 2) if st.session_state.edit_mode else 2
+    num_batches = st.number_input("Number of batches", min_value=1, step=1, value=default_batches, key="num_batches")
     batches = []
+
     for i in range(num_batches):
         with st.expander(f"Batch {i+1}"):
-            batch_name = st.text_input(f"Batch name", key=f"b_name_{i}", value=st.session_state.get(f"b_name_{i}", f"Batch{i+1}"))
-            num_theory_courses = st.number_input(f"Number of theory courses", min_value=0, key=f"b_theory_courses_{i}", value=st.session_state.get(f"b_theory_courses_{i}", 2))
+            # Get saved values if in edit mode
+            saved_batch = None
+            if st.session_state.edit_mode and 'batches' in st.session_state.get('saved_data', {}):
+                saved_batches = st.session_state.saved_data['batches']
+                if i < len(saved_batches):
+                    saved_batch = saved_batches[i]
+
+            batch_name = st.text_input(
+                f"Batch name",
+                value=saved_batch['name'] if saved_batch else f"Batch{i+1}",
+                key=f"b_name_{i}"
+            )
+
+            # Theory Courses
+            default_theory = len(saved_batch['theory_courses']) if saved_batch else 2
+            num_theory_courses = st.number_input(
+                f"Number of theory courses",
+                min_value=0,
+                value=default_theory,
+                key=f"b_theory_courses_{i}"
+            )
             theory_courses = []
             for j in range(num_theory_courses):
-                name = st.text_input(f"Theory Course name", key=f"tc_name_{i}_{j}", value=st.session_state.get(f"tc_name_{i}_{j}", f"Course{j+1}"))
-                required_hours = st.number_input(f"Required hours", min_value=1, key=f"tc_hours_{i}_{j}", value=st.session_state.get(f"tc_hours_{i}_{j}", 2))
-                theory_courses.append({"name": name, "subject": name, "required_hours": required_hours, "type": "theory"})
-            num_labs = st.number_input(f"Number of practical labs", min_value=0, key=f"b_labs_{i}", value=st.session_state.get(f"b_labs_{i}", 1))
+                saved_course = None
+                if saved_batch and j < len(saved_batch['theory_courses']):
+                    saved_course = saved_batch['theory_courses'][j]
+
+                name = st.text_input(
+                    f"Theory Course name",
+                    value=saved_course['name'] if saved_course else f"Course{j+1}",
+                    key=f"tc_name_{i}_{j}"
+                )
+                required_hours = st.number_input(
+                    f"Required hours",
+                    min_value=1,
+                    value=saved_course['required_hours'] if saved_course else 2,
+                    key=f"tc_hours_{i}_{j}"
+                )
+                theory_courses.append({
+                    "name": name,
+                    "subject": name,
+                    "required_hours": required_hours,
+                    "type": "theory"
+                })
+
+            # Labs
+            default_labs = len(saved_batch['labs']) if saved_batch else 1
+            num_labs = st.number_input(
+                f"Number of practical labs",
+                min_value=0,
+                value=default_labs,
+                key=f"b_labs_{i}"
+            )
             labs = []
             for j in range(num_labs):
-                name = st.text_input(f"Lab name", key=f"l_name_{i}_{j}", value=st.session_state.get(f"l_name_{i}_{j}", f"Lab{j+1}"))
-                number_of_sessions = st.number_input(f"Number of sessions", min_value=1, key=f"l_sessions_{i}_{j}", value=st.session_state.get(f"l_sessions_{i}_{j}", 1))
-                session_duration = st.selectbox(f"Session duration (hours)", options=[3, 4], key=f"l_duration_{i}_{j}", index=[3, 4].index(st.session_state.get(f"l_duration_{i}_{j}", 3)))
+                saved_lab = None
+                if saved_batch and j < len(saved_batch['labs']):
+                    saved_lab = saved_batch['labs'][j]
+
+                name = st.text_input(
+                    f"Lab name",
+                    value=saved_lab['name'] if saved_lab else f"Lab{j+1}",
+                    key=f"l_name_{i}_{j}"
+                )
+                number_of_sessions = st.number_input(
+                    f"Number of sessions",
+                    min_value=1,
+                    value=saved_lab['number_of_sessions'] if saved_lab else 1,
+                    key=f"l_sessions_{i}_{j}"
+                )
+                session_duration = st.selectbox(
+                    f"Session duration (hours)",
+                    options=[3, 4],
+                    index=[3, 4].index(saved_lab['session_duration']) if saved_lab else 0,
+                    key=f"l_duration_{i}_{j}"
+                )
                 labs.append({
                     "name": name,
                     "subject": name,
@@ -309,65 +387,115 @@ elif st.session_state.page == 'main':
 
     # Classrooms
     st.header("Classrooms")
-    num_classrooms = st.number_input("Number of classrooms", min_value=1, step=1, value=st.session_state.get("num_classrooms", 2), key="num_classrooms")
+    default_classrooms = st.session_state.get('saved_data', {}).get('num_classrooms', 2) if st.session_state.edit_mode else 2
+    num_classrooms = st.number_input("Number of classrooms", min_value=1, step=1, value=default_classrooms, key="num_classrooms")
 
     # Save inputs
-    if st.button("Save Inputs"):
-        data_to_save = {
-            "num_days": num_days,
-            "num_periods": num_periods,
-            "start_time": start_time,
-            "period_duration": period_duration,
-            "num_teachers": num_teachers,
-            "teachers": teachers,
-            "num_batches": num_batches,
-            "batches": batches,
-            "num_classrooms": num_classrooms
-        }
-        if save_user_inputs(user_id, data_to_save):
-            st.success("Inputs saved successfully!")
-        else:
-            st.error("Failed to save inputs. Please try again.")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("Save Inputs"):
+            try:
+                data_to_save = {
+                    "num_days": num_days,
+                    "num_periods": num_periods,
+                    "start_time": start_time,
+                    "period_duration": period_duration,
+                    "num_teachers": num_teachers,
+                    "teachers": teachers,
+                    "num_batches": num_batches,
+                    "batches": batches,
+                    "num_classrooms": num_classrooms
+                }
+                
+                # Save to database
+                if save_user_inputs(user_id, data_to_save):
+                    # Update session state
+                    st.session_state.saved_data = data_to_save
+                    st.session_state.edit_mode = True
+                    st.session_state.show_save_success = True
+                    st.rerun()
+                else:
+                    st.error("Failed to save inputs. Please try again.")
+            except Exception as e:
+                st.error(f"An error occurred while saving: {str(e)}")
+
+    # Edit mode toggle
+    with col2:
+        if st.button("Edit Saved Data" if not st.session_state.edit_mode else "Cancel Edit"):
+            try:
+                if not st.session_state.edit_mode:
+                    # Entering edit mode - load saved data
+                    existing_data = load_user_inputs(user_id)
+                    if existing_data:
+                        st.session_state.saved_data = existing_data
+                        st.session_state.edit_mode = True
+                        st.session_state.show_load_success = True
+                    else:
+                        st.warning("No saved data found.")
+                else:
+                    # Exiting edit mode - clear saved data
+                    if 'saved_data' in st.session_state:
+                        del st.session_state.saved_data
+                    st.session_state.edit_mode = False
+                st.rerun()
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
 
     # Clear inputs button with confirmation
-    col1, col2 = st.columns(2)
-    with col1:
+    with col3:
         if st.button("Clear Inputs"):
             st.session_state.show_clear_confirmation = True
     
     if st.session_state.get('show_clear_confirmation', False):
         st.warning("Are you sure you want to clear all your inputs? This action cannot be undone.")
-        with col2:
+        col1, col2 = st.columns(2)
+        with col1:
             if st.button("Yes, Clear All Data"):
-                # Clear all session state data
-                for key in list(st.session_state.keys()):
-                    if key not in ['user_id', 'page']:  # Preserve login state
-                        del st.session_state[key]
-                
-                # Reset to default values
-                st.session_state.update({
-                    "num_days": 5,
-                    "num_periods": 7,
-                    "start_time": "09:30",
-                    "period_duration": 60,
-                    "num_teachers": 2,
-                    "num_batches": 2,
-                    "num_classrooms": 2
-                })
-                
-                # Clear the database entry for this user
                 try:
+                    # Clear all session state data
+                    for key in list(st.session_state.keys()):
+                        if key not in ['user_id', 'page']:  # Preserve login state
+                            del st.session_state[key]
+                    
+                    # Reset to default values
+                    st.session_state.update({
+                        "num_days": 5,
+                        "num_periods": 7,
+                        "start_time": "09:30",
+                        "period_duration": 60,
+                        "num_teachers": 2,
+                        "num_batches": 2,
+                        "num_classrooms": 2
+                    })
+                    
+                    # Clear the database entry for this user
                     conn = sqlite3.connect("schedule_data.db")
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM user_inputs WHERE user_id = ?", (user_id,))
                     conn.commit()
                     conn.close()
+                    
                     st.success("All inputs have been cleared!")
-                except sqlite3.Error as e:
-                    st.error(f"Failed to clear data from database: {e}")
-                
+                    st.session_state.show_clear_confirmation = False
+                    st.session_state.edit_mode = False
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"An error occurred while clearing data: {str(e)}")
+        with col2:
+            if st.button("No, Keep Data"):
                 st.session_state.show_clear_confirmation = False
                 st.rerun()
+
+    # Show edit mode indicator and success messages
+    if st.session_state.edit_mode:
+        message = "You are in edit mode. Make your changes and click 'Save Inputs' to update."
+        if st.session_state.get('show_save_success', False):
+            message += " ✓ Data saved successfully!"
+            st.session_state.show_save_success = False
+        elif st.session_state.get('show_load_success', False):
+            message += " ✓ Saved data loaded successfully!"
+            st.session_state.show_load_success = False
+        st.info(message)
 
     # Generate Schedule
     if st.button("Generate Schedule"):

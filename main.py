@@ -544,7 +544,7 @@ elif st.session_state.page == 'main':
                         save_schedule_to_db(user_id, batch.name, schedule_table.to_dict())
 
                     excel_file = io.BytesIO()
-                    with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
+                    with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
                         for name, df in batch_tables.items():
                             df.to_excel(writer, sheet_name=name)
                     excel_file.seek(0)

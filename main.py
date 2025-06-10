@@ -372,8 +372,8 @@ elif st.session_state.page == 'main':
                 )
                 session_duration = st.selectbox(
                     f"Session duration (hours)",
-                    options=[3, 4],
-                    index=[3, 4].index(saved_lab['session_duration']) if saved_lab else 0,
+                    options=[2, 3, 4],
+                    index=[2, 3, 4].index(saved_lab['session_duration']) if saved_lab else 1,
                     key=f"l_duration_{i}_{j}"
                 )
                 labs.append({
@@ -555,7 +555,7 @@ elif st.session_state.page == 'main':
                 st.error("Failed: Unable to schedule with given constraints.")
 
     # Display Previous Schedules
-    st.header("Previously Saved Timetables")
+    st.header("Previously Generated Timetables")
     schedules = load_schedules_from_db(user_id)
     if schedules:
         for name, data_dict in schedules:
